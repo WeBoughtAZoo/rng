@@ -1,0 +1,70 @@
+package one;
+
+import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.Function2;
+import org.apache.spark.api.java.function.PairFunction;
+import scala.Tuple2;
+
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+
+
+public class WordCount {
+    public static void main(String[] args){
+        String inputFile = "D:\\sparktest.txt";
+        // 初始化Spark驱动器对象
+        SparkConf sparkConf = new SparkConf().setMaster("local").setAppName("WordCount");
+        JavaSparkContext javaSparkContext = new JavaSparkContext(sparkConf);
+
+        // 读取我们的数据流
+        JavaRDD<String> input = javaSparkContext.textFile(inputFile);
+
+        // 切分单词
+        JavaRDD<String> wordsWay1 = input.flatMap(
+                new FlatMapFunction<String, String>() {
+                    @Override
+                    public Iterator<String> call(String s) throws Exception {
+                        return Arrays.asList(s.split(" ")).iterator();
+                    }
+                }
+        );
+        JavaRDD<String> wordsWay2 = input.flatMap(s -> Arrays.asList(s.split(" ")).iterator());
+        System.out.println(wordsWay1.equals(wordsWay2));
+
+        // 转换为键值对并计数
+        // way1
+        JavaPairRDD<String, Integer> counts1 = wordsWay1.mapToPair(
+                new PairFunction<String, String, Integer>() {
+                    @Override
+                    public Tuple2<String, Integer> call(String s) throws Exception {
+                        return new Tuple2(s, 1);
+                    }
+                }
+        ).reduceByKey(
+                new Function2<Integer, Integer, Integer>() {
+                    @Override
+                    public Integer call(Integer x, Integer y) throws Exception {
+                        return x + y;
+                    }
+                }
+        );
+        // way2
+        //JavaPairRDD<String, Integer> ones = wordsWay1.mapToPair(s -> new Tuple2<>(s, 1));
+        //JavaPairRDD<String, Integer> counts2 = ones.reduceByKey((i1, i2) -> i1+i2 );
+        //System.out.println(counts2.equals(counts2));
+        //System.out.println("*******************");
+
+
+        // 输出结果
+        List<Tuple2<String, Integer>> output = counts1.collect();
+        for(Tuple2<String, Integer> tuple : output){
+            System.out.println(tuple._1() + ": " + tuple._2());
+        }
+        javaSparkContext.stop();
+    }
+}
